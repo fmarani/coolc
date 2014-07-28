@@ -101,17 +101,17 @@ def t_STRING_anything(t):
     r"[^\n]"
     if t.lexer.string_backslashed:
         if t.value == 'b':
-            t.lexer.stringbuf.append('\b')
+            t.lexer.stringbuf += '\b'
         elif t.value == 't':
-            t.lexer.stringbuf.append('\t')
+            t.lexer.stringbuf += '\t'
         elif t.value == 'n':
-            t.lexer.stringbuf.append('\n')
+            t.lexer.stringbuf += '\n'
         elif t.value == 'f':
-            t.lexer.stringbuf.append('\f')
+            t.lexer.stringbuf += '\f'
         elif t.value == '\\':
-            t.lexer.stringbuf.append('\\')
+            t.lexer.stringbuf += '\\'
         else:
-            t.lexer.stringbuf.append(t.value)
+            t.lexer.stringbuf += t.value
         t.lexer.string_backslashed = False
     else:
         if t.value != '\\':
