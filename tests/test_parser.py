@@ -1,15 +1,17 @@
 from compiler.parser import parser
-
+from compiler.parser import Class, Method, Attr, Object, Int, Str, Block, Assign, \
+        Dispatch, StaticDispatch, SelfDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
+        If, While, Let, Case, New, Isvoid, Neg, Not
 
 def test_empty_class_definition():
     program = "class A { };"
-    expected = ('class', 'A', 'Object', [])
+    expected = [Class('A', 'Object', [])]
     assert parser.parse(program) == expected
 
 
 def test_class_definition_with_inherits():
     program = "class A inherits Top { };"
-    expected = ('class', 'A', 'Top', [])
+    expected = [Class('A', 'Top', [])]
     assert parser.parse(program) == expected
 
 
@@ -19,12 +21,12 @@ def test_class_with_uninitialized_attributes():
         attr1:AttrType;
         attr2: AttrType;
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('attr', 'attr1', 'AttrType', None),
-                    ('attr', 'attr2', 'AttrType', None),
+                    Attr('attr1', 'AttrType', None),
+                    Attr('attr2', 'AttrType', None),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -34,52 +36,52 @@ def test_class_with_initialized_attributes():
         attr1:AttrType <- otherObj;
         attr2: AttrType <- initialObj;
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('attr', 'attr1', 'AttrType', ('object', 'otherObj')),
-                    ('attr', 'attr2', 'AttrType', ('object', 'initialObj')),
+                    Attr('attr1', 'AttrType', Object('otherObj')),
+                    Attr('attr2', 'AttrType', Object('initialObj')),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
 def test_class_with_method_without_formals():
     program = """class A { funk():ReturnType { returnvalue }; };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'ReturnType', ('object', 'returnvalue')),
+                    Method('funk', [], 'ReturnType', Object('returnvalue')),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
 def test_class_with_method_with_formals():
     program = """class A { funk(x:X, y:Y):ReturnType { x }; };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [('x', 'X'), ('y', 'Y')], 'ReturnType', ('object', 'x')),
+                    Method('funk', [('x', 'X'), ('y', 'Y')], 'ReturnType', Object('x')),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
 def test_class_with_method_returning_int():
     program = """class A { funk():ReturnType { 12 }; };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'ReturnType', ('int', 12)),
+                    Method('funk', [], 'ReturnType', Int(12)),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
 def test_class_with_method_returning_str():
     program = """class A { funk():ReturnType { "blabla" }; };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'ReturnType', ('str', 'blabla')),
+                    Method('funk', [], 'ReturnType', Str('blabla')),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -92,11 +94,11 @@ def test_class_with_method_with_block():
           }
        };
     };"""
-    expected = ('class', 'A', 'WithVar',
+    expected = [Class('A', 'WithVar',
                 [
-                    ('method', 'set_var', [('num', 'Int')], 'SELF_TYPE', ('block', [('object', 'self')])),
+                    Method('set_var', [('num', 'Int')], 'SELF_TYPE', Block([Object('self')])),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -107,11 +109,11 @@ def test_simple_dispatch_with_no_args():
             obj.method()
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type', ('dispatch', ('object', 'obj'), 'method', [])),
+                    Method('funk', [], 'Type', Dispatch(Object('obj'), 'method', [])),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -122,11 +124,11 @@ def test_simple_dispatch_with_one_arg():
             obj.method(2)
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type', ('dispatch', ('object', 'obj'), 'method', [('int', 2)])),
+                    Method('funk', [], 'Type', Dispatch(Object('obj'), 'method', [Int(2)])),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -137,11 +139,11 @@ def test_simple_dispatch_with_multiple_args():
             obj.method(2, "blabla", x)
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type', ('dispatch', ('object', 'obj'), 'method', [('int', 2), ('str', 'blabla'), ('object', 'x')])),
+                    Method('funk', [], 'Type', Dispatch(Object('obj'), 'method', [Int(2), Str('blabla'), Object('x')])),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -152,11 +154,11 @@ def test_static_dispatch_with_no_args():
             obj@Klass.method()
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type', ('static_dispatch', ('object', 'obj'), 'Klass', 'method', [])),
+                    Method('funk', [], 'Type', StaticDispatch(Object('obj'), 'Klass', 'method', [])),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -167,11 +169,11 @@ def test_self_dispatch_with_no_args():
             method()
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type', ('self_dispatch', 'method', [])),
+                    Method('funk', [], 'Type', SelfDispatch('method', [])),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -182,13 +184,13 @@ def test_if_statements():
             if x < 0 then 1 else 2 fi
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('if', ('<', ('object', 'x'), ('int', 0)), ('int', 1), ('int', 2))
+                    Method('funk', [], 'Type',
+                        If(Lt(Object('x'), Int(0)), Int(1), Int(2))
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -199,13 +201,13 @@ def test_while_statements():
             while x < 0 loop 1 pool
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('while', ('<', ('object', 'x'), ('int', 0)), ('int', 1))
+                    Method('funk', [], 'Type',
+                        While(Lt(Object('x'), Int(0)), Int(1))
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -216,13 +218,13 @@ def test_let_statement():
             let x:TypeX in x + 1
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('let', 'x', 'TypeX', None, ('+', ('object', 'x'), ('int', 1)))
+                    Method('funk', [], 'Type',
+                        Let('x', 'TypeX', None, Plus(Object('x'), Int(1)))
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -233,13 +235,13 @@ def test_let_statement_with_assignment():
             let x:TypeX <- 5 in x + 1
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('let', 'x', 'TypeX', ('int', 5), ('+', ('object', 'x'), ('int', 1)))
+                    Method('funk', [], 'Type',
+                        Let('x', 'TypeX', Int(5), Plus(Object('x'), Int(1)))
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -252,17 +254,17 @@ def test_let_statement_with_two_vars():
                 in x + 1
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('let', 'x', 'TypeX', ('int', 5),
-                            ('let', 'y', 'TypeY', None,
-                                ('+', ('object', 'x'), ('int', 1))
+                    Method('funk', [], 'Type',
+                        Let('x', 'TypeX', Int(5),
+                            Let('y', 'TypeY', None,
+                                Plus(Object('x'), Int(1))
                              )
                         )
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -276,19 +278,19 @@ def test_let_statement_with_three_vars():
                 in x + 1
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('let', 'x', 'TypeX', None,
-                            ('let', 'y', 'TypeY', ('int', 3),
-                                ('let', 'z', 'ZType', ('*', ('+', ('int', 2), ('int', 2)), ('int', 5)),
-                                    ('+', ('object', 'x'), ('int', 1))
+                    Method('funk', [], 'Type',
+                        Let('x', 'TypeX', None,
+                            Let('y', 'TypeY', Int(3),
+                                Let('z', 'ZType', Mult(Plus(Int(2), Int(2)), Int(5)),
+                                    Plus(Object('x'), Int(1))
                                 )
                             )
                         )
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -301,19 +303,16 @@ def test_let_statement_with_two_vars_error_in_first():
                 in x + 1
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('let', 'x', 'TypeX', ('int', 5),
-                                ('+', ('object', 'x'), ('int', 1))
+                    Method('funk', [], 'Type',
+                        Let('x', 'TypeX', Int(5),
+                                Plus(Object('x'), Int(1))
                         )
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
-
-
-# do CASE
 
 
 def test_new():
@@ -323,13 +322,13 @@ def test_new():
             new B
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('new', 'B')
+                    Method('funk', [], 'Type',
+                        New('B')
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -340,13 +339,13 @@ def test_isvoid():
             isvoid B
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('isvoid', 'B')
+                    Method('funk', [], 'Type',
+                        Isvoid('B')
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -361,17 +360,17 @@ def test_case():
             esac
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('case', ('int', 1),
-                         [('x', 'Int', ('int', 10)),
-                          ('x', 'String', ('int', 9)),
-                          ('x', 'Guru', ('int', 8))]
+                    Method('funk', [], 'Type',
+                        Case(Int(1),
+                         [('x', 'Int', Int(10)),
+                          ('x', 'String', Int(9)),
+                          ('x', 'Guru', Int(8))]
                          )
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -384,15 +383,15 @@ def test_neg():
             esac
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('case', ('neg', ('int', 1)),
-                         [('x', 'Int', ('int', 10))]
+                    Method('funk', [], 'Type',
+                        Case(Neg(Int(1)),
+                         [('x', 'Int', Int(10))]
                          )
                      ),
                 ]
-                )
+                )]
     assert parser.parse(program) == expected
 
 
@@ -405,15 +404,41 @@ def test_not():
             esac
        };
     };"""
-    expected = ('class', 'A', 'Object',
+    expected = [Class('A', 'Object',
                 [
-                    ('method', 'funk', [], 'Type',
-                        ('case', ('not', ('int', 1)),
-                         [('x', 'Int', ('int', 10))]
+                    Method('funk', [], 'Type',
+                        Case(Not(Int(1)),
+                         [('x', 'Int', Int(10))]
                          )
                      ),
                 ]
-                )
+                )]
+    assert parser.parse(program) == expected
+
+
+def test_two_classes_defined():
+    program = """
+    class A {
+       funk():Type {
+            a
+       };
+    };
+    class B {
+       funk():Type {
+            a
+       };
+    };
+    """
+    expected = [Class('A', 'Object',
+                [
+                    Method('funk', [], 'Type', Object('a')),
+                ]
+                ),
+                Class('B', 'Object',
+                [
+                    Method('funk', [], 'Type', Object('a')),
+                ]
+                )]
     assert parser.parse(program) == expected
 
 
