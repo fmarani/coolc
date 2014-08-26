@@ -1,35 +1,45 @@
 from collections import namedtuple
+from types import new_class
 import ply.yacc as yacc
 
 # Get the token map from the lexer.  This is required.
 from .lexer import tokens
 
+# namedtuple is the main representation in the ast, but sometimes we need
+# the ability to add more information, used for the compiler internally
+# inferred return types are one of this internal piece of information
+class Returnable:
+    return_type = None
+
+def returnable_namedtuple(type_name, fields):
+    return new_class(type_name, (Returnable, namedtuple(type_name, fields)))
+
 Class = namedtuple("Class", "name, parent, feature_list")
 Method = namedtuple("Method", "name, formal_list, return_type, body")
 Attr = namedtuple("Attr", "name, type, body")
-Object = namedtuple("Object", "name")
-Int = namedtuple("Int", "name")
-Str = namedtuple("Str", "name")
-Block = namedtuple("Block", "body")
+Object = returnable_namedtuple("Object", "name")
+Int = returnable_namedtuple("Int", "name")
+Str = returnable_namedtuple("Str", "name")
+Block = returnable_namedtuple("Block", "body")
 Assign = namedtuple("Assign", "name, body")
-Dispatch = namedtuple("Dispatch", "body, method, expr_list")
-StaticDispatch = namedtuple("StaticDispatch", "body, type, method, expr_list")
-SelfDispatch = namedtuple("SelfDispatch", "method, expr_list")
-Plus = namedtuple("Plus", "first, second")
-Sub = namedtuple("Sub", "first, second")
-Mult = namedtuple("Mult", "first, second")
-Div = namedtuple("Div", "first, second")
-Lt = namedtuple("Lt", "first, second")
-Le = namedtuple("Le", "first, second")
-Eq = namedtuple("Eq", "first, second")
-If = namedtuple("If", "predicate, then_body, else_body")
+Dispatch = returnable_namedtuple("Dispatch", "body, method, expr_list")
+StaticDispatch = returnable_namedtuple("StaticDispatch", "body, type, method, expr_list")
+SelfDispatch = returnable_namedtuple("SelfDispatch", "method, expr_list")
+Plus = returnable_namedtuple("Plus", "first, second")
+Sub = returnable_namedtuple("Sub", "first, second")
+Mult = returnable_namedtuple("Mult", "first, second")
+Div = returnable_namedtuple("Div", "first, second")
+Lt = returnable_namedtuple("Lt", "first, second")
+Le = returnable_namedtuple("Le", "first, second")
+Eq = returnable_namedtuple("Eq", "first, second")
+If = returnable_namedtuple("If", "predicate, then_body, else_body")
 While = namedtuple("While", "predicate, body")
-Let = namedtuple("Let", "object, type, init, body")
-Case = namedtuple("Case", "expr, case_list")
-New = namedtuple("New", "type")
-Isvoid = namedtuple("Isvoid", "body")
-Neg = namedtuple("Neg", "body")
-Not = namedtuple("Not", "body")
+Let = returnable_namedtuple("Let", "object, type, init, body")
+Case = returnable_namedtuple("Case", "expr, case_list")
+New = returnable_namedtuple("New", "type")
+Isvoid = returnable_namedtuple("Isvoid", "body")
+Neg = returnable_namedtuple("Neg", "body")
+Not = returnable_namedtuple("Not", "body")
 
 def p_class_list_many(p):
     """class_list : class_list class SEMI"""
