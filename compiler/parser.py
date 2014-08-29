@@ -160,7 +160,7 @@ def p_expression_basic_math(p):
     if p[2] == '+':
         p[0] = Plus(p[1], p[3])
     elif p[2] == '-':
-        p[0] = Minus(p[1], p[3])
+        p[0] = Sub(p[1], p[3])
     elif p[2] == '*':
         p[0] = Mult(p[1], p[3])
     elif p[2] == '/':

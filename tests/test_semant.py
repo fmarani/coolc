@@ -51,6 +51,7 @@ def test_double_class_definition_triggers_error():
 
 def test_classes_inheriting_correctly_validates():
     ast = [Class('A', 'B', []), Class('B', 'Object', [])]
+    semant.install_base_classes(ast)
     semant.build_inheritance_graph(ast)
     semant.check_for_inheritance_cycles()
 

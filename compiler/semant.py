@@ -55,11 +55,14 @@ def build_inheritance_graph(ast):
         if cl.name in classes_dict:
             raise SemantError("class %s already defined" % cl.name)
         classes_dict[cl.name] = cl
+        if cl.name == "Object":
+            continue  # Object has no parent
         inheritance_graph[cl.parent].add(cl.name)
 
 
 def check_for_undefined_classes():
-    for parentc in inheritance_graph.keys():
+    initial_parents = list(inheritance_graph.keys())
+    for parentc in initial_parents:
         if parentc not in classes_dict and parentc != "Object":
             warnings.warn("classes %s inherit from an undefined parent %s" % (inheritance_graph[parentc], parentc), SemantWarning)
             inheritance_graph['Object'] |= inheritance_graph[parentc]  # intermediate class does not exist so make these classes inherit from Object
