@@ -187,26 +187,26 @@ def check_scopes_and_infer_return_types(cl):
             traverse_expression(feature.body, variable_scopes)
             variable_scopes.destroy_scope()
 
-def lowest_common_ancestor(cl1, cl2):
+
+def lowest_common_ancestor(*classes):
     """return the lowest common parent of cl1 and cl2"""
     def ascend_tree(cl):
         yield cl.name
         if cl.parent:
-            ascend_tree(cl.parent)
+            yield from ascend_tree(classes_dict[cl.parent])
 
-    cl1_inheritance_path = list(ascend_tree(cl1))
-    cl2_inheritance_path = list(ascend_tree(cl2))
+    inheritance_paths = []
+    for cl in classes:
+        path = list(ascend_tree(cl))
+        path.reverse()
+        inheritance_paths.append(path)
 
-    if len(cl1_inheritance_path) > len(cl2_inheritance_path):
-        shorter_path = cl2_inheritance_path
-        longer_path = cl1_inheritance_path
-    else:
-        shorter_path = cl1_inheritance_path
-        longer_path = cl2_inheritance_path
+    smallest_inheritance_path_length = min(len(x) for x in inheritance_paths)
 
-    for step in range(len(shorter_path)):
-        if shorter_path[step] != longer_path[step]:
-            return shorter_path[step-1]
+    for step in range(smallest_inheritance_path_length):
+        inheritance_points = [x[step] for x in inheritance_paths]
+        if len(set(inheritance_points)) > 1:
+            return inheritance_paths[0][step-1]  # any would do
 
 
 def traverse_expression(expression, variable_scopes):
@@ -218,6 +218,9 @@ def traverse_expression(expression, variable_scopes):
         traverse_expression(expression.second, variable_scopes)
         expression.return_type = "Bool"
     elif isinstance(expression, Neg):
+        traverse_expression(expression.body, variable_scopes)
+        expression.return_type = "Bool"
+    elif isinstance(expression, Not):
         traverse_expression(expression.body, variable_scopes)
         expression.return_type = "Bool"
     elif any(isinstance(expression, X) for X in [Plus, Sub, Mult, Div]):
@@ -239,11 +242,12 @@ def traverse_expression(expression, variable_scopes):
         last_type = None
         for expr in expression.body:
             traverse_expression(expr, variable_scopes)
-            last_type = expr.return_type
+            last_type = getattr(expr, 'return_type', None)
         expression.return_type = last_type
     elif isinstance(expression, Assign):
         traverse_expression(expression.body, variable_scopes)
-    elif isinstance(expression, Dispatch):
+        traverse_expression(expression.name, variable_scopes)
+    elif isinstance(expression, Dispatch) or isinstance(expression, StaticDispatch):
         traverse_expression(expression.body, variable_scopes)
         for expr in expression.expr_list:
             traverse_expression(expr, variable_scopes)
@@ -257,10 +261,13 @@ def traverse_expression(expression, variable_scopes):
         expression.return_type = ret_type
     elif isinstance(expression, Case):
         traverse_expression(expression.expr, variable_scopes)
+        branch_types = []
         for case in expression.case_list:
             variable_scopes.new_scope()  # every branch of case has its own scope
             variable_scopes[case[0]] = case[1]
             traverse_expression(case[2], variable_scopes)
+            branch_types.append(classes_dict[case[2].return_type])
+        expression.return_type = lowest_common_ancestor(*branch_types)
     elif isinstance(expression, Object):
         if expression.name not in variable_scopes:
             raise SemantError("variable %s not in scope" % expression.name)
@@ -336,6 +343,7 @@ def type_check(cl):
         if isinstance(feature, Attr):
             if feature.body:
                 # FIXME: deal with SELF TYPE
+                type_check_expression(feature.body)
                 childcln = feature.body.return_type
                 parentcln = feature.type
                 if not is_conformant(childcln, parentcln):
@@ -343,16 +351,16 @@ def type_check(cl):
         elif isinstance(feature, Method):
             for formal in feature.formal_list:
                 if formal[1] == "SELF_TYPE":
-                    raise SemantError("formal %s cannot have type SELF_TYPE" % formal.name)
+                    raise SemantError("formal %s cannot have type SELF_TYPE" % formal[0])
                 elif formal[1] not in classes_dict:
-                    raise SemantError("formal %s has a undefined type" % formal.name)
+                    raise SemantError("formal %s has a undefined type" % formal[0])
             if feature.body is None:
                 continue  # for internal classes, some methods body are not defined
             type_check_expression(feature.body)
             returnedcln = feature.body.return_type
             declaredcln = feature.return_type
             if not is_conformant(returnedcln, declaredcln):
-                raise SemantError("Inferred type %s for method %s does not conform to declared type %s" % (returnedcl, feature.name, declaredcl))
+                raise SemantError("Inferred type %s for method %s does not conform to declared type %s" % (returnedcln, feature.name, declaredcln))
 
 
 
@@ -363,9 +371,9 @@ def type_check_expression(expression):
         for case in expression.case_list:
             type_check_expression(case[2])
     elif isinstance(expression, Assign):
-        type_check_expression(expression[2])
-        if is_conformant(expression.return_type, expression[1]):
-            raise SemantError("The inferred type %s for %s is not conformant to declared type %s".format(expression.return_type, expression[0], expression[1]))
+        type_check_expression(expression.body)
+        if not is_conformant(expression.body.return_type, expression.name.return_type):
+            raise SemantError("The inferred type %s for %s is not conformant to declared type %s" % (expression.body.return_type, expression.name.name, expression.name.return_type))
     elif isinstance(expression, If):
         type_check_expression(expression.predicate)
         type_check_expression(expression.then_body)
@@ -374,8 +382,8 @@ def type_check_expression(expression):
             raise SemantError("If statements must have boolean conditions")
     elif isinstance(expression, Let):
         type_check_expression(expression.init)
-        if is_conformant(expression.init.return_type, expression.type):
-            raise SemantError("The inferred type %s for let init is not conformant to declared type %s".format(expression.return_type, expression.type))
+        if not is_conformant(expression.init.return_type, expression.type):
+            raise SemantError("The inferred type %s for let init is not conformant to declared type %s" % (expression.init.return_type, expression.type))
     elif isinstance(expression, Block):
         for line in expression.body:
             type_check_expression(line)
@@ -386,9 +394,10 @@ def type_check_expression(expression):
         if isinstance(expression, StaticDispatch):
             # additional check on static dispatch
             if not is_conformant(bodycln, expression.type):
-                raise SemantError("Static dispatch expression (before @Type) does not conform to declared type %s".format(expression.type))
+                raise SemantError("Static dispatch expression (before @Type) does not conform to declared type {}".format(expression.type))
 
         called_method = None
+        bodycl = classes_dict[bodycln]
         for feature in bodycl.feature_list:
             if isinstance(feature, Method) and feature.name == expression.method:
                 called_method = feature
@@ -399,8 +408,8 @@ def type_check_expression(expression):
         else:
             # check conformance of arguments
             for expr, formal in zip(expression.expr_list, called_method.formal_list):
-                if not is_conformant(expr, formal):
-                    raise SemantError("Argument passed to method {} in class {} is not conformant to its declaration".format(called_method.name, bodycl.name))
+                if not is_conformant(expr.return_type, formal[1]):
+                    raise SemantError("Argument {} passed to method {} in class {} is not conformant to its {} declaration".format(expr.return_type, called_method.name, bodycl.name, formal[1]))
     elif isinstance(expression, While):
         type_check_expression(expression.predicate)
         type_check_expression(expression.body)
@@ -412,7 +421,7 @@ def type_check_expression(expression):
         type_check_expression(expression.body)
         if expression.body.return_type != "Bool":
             raise SemantError("Not statement require boolean values")
-    elif isinstance(expression, Lt) or isinstance(expression, Le) or isinstance(expression, Eq):
+    elif isinstance(expression, Lt) or isinstance(expression, Le):
         type_check_expression(expression.first)
         type_check_expression(expression.second)
         if expression.first.return_type != "Int" or expression.second.return_type != "Int":
@@ -436,16 +445,7 @@ def type_check_expression(expression):
            (type1 == "Str" and type2 == "Str"):
             pass  # comparing basic types together is ok
         else:
-            raise SemantError("Illegal comparison with a basic type")
-
-
-
-
-
-
-
-
-
+            raise SemantError("Comparison is only possible among same base types")
 
 
 def semant(ast):

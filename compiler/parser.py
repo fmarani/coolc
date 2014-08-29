@@ -123,7 +123,8 @@ def p_block_list_single(p):
 
 def p_expression_assignment(p):
     """expression : OBJECTID ASSIGN expression"""
-    p[0] = Assign(p[1], p[3])
+    # use Object so we can traverse it. It needs to exist already
+    p[0] = Assign(Object(p[1]), p[3])
 
 def p_expression_dispatch(p):
     """expression : expression DOT OBJECTID LPAREN expr_list RPAREN"""
