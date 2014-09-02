@@ -1,6 +1,6 @@
 from compiler.parser import parser
 from compiler.parser import Class, Method, Attr, Object, Int, Str, Block, Assign, \
-        Dispatch, StaticDispatch, SelfDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
+        Dispatch, StaticDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
         If, While, Let, Case, New, Isvoid, Neg, Not
 
 from compiler import semant
@@ -598,6 +598,43 @@ def test_dispatch_to_existent_method_with_right_args_succeeds():
         semant.type_check(cl)
 
 
+def test_self_dispatch_to_inexistent_method_crashes():
+    ast = [
+            Class('A', 'Object', [
+               Method('funk', [], None,
+                   Dispatch("self", "ghostmethod", [])
+               ),
+            ])
+    ]
+    semant.install_base_classes(ast)
+    semant.build_inheritance_graph(ast)
+    semant.expand_inherited_classes()
+    for cl in ast:
+        semant.check_scopes_and_infer_return_types(cl)
+    with pytest.raises(semant.SemantError) as e:
+        for cl in ast:
+            semant.type_check(cl)
+    assert str(e.value) == "Tried to call an undefined method in class A"
+
+
+def test_self_dispatch_to_existent_method_with_right_args_succeeds():
+    ast = [
+            Class('A', 'Object', [
+               Method('addOne', [('x', 'Int')], 'Int', Plus(Object('x'), Int(1))),
+               Method('funk', [], None,
+                   Dispatch("self", "addOne", [Int(2)])
+               ),
+            ])
+    ]
+    semant.install_base_classes(ast)
+    semant.build_inheritance_graph(ast)
+    semant.expand_inherited_classes()
+    for cl in ast:
+        semant.check_scopes_and_infer_return_types(cl)
+    for cl in ast:
+        semant.type_check(cl)
+
+
 def test_while_statements_require_booleans():
     ast = [
             Class('A', 'Object', [
@@ -657,5 +694,59 @@ def test_comparison_between_basic_type_and_not_fails():
         for cl in ast:
             semant.type_check(cl)
     assert str(e.value) == "Comparison is only possible among same base types"
+
+
+def test_returning_self():
+    ast = [
+            Class('A', 'Object', [
+               Attr('singleton', 'SELF_TYPE', New("SELF_TYPE")),
+               Method('ret', [], 'SELF_TYPE',
+                      Object("singleton")
+               ),
+            ])
+    ]
+    semant.install_base_classes(ast)
+    semant.build_inheritance_graph(ast)
+    for cl in ast:
+        semant.check_scopes_and_infer_return_types(cl)
+    for cl in ast:
+        semant.type_check(cl)
+
+
+def test_returning_self_one_level_up_in_inheritance():
+    ast = [
+            Class('A', 'Object', [
+               Attr('singleton', 'SELF_TYPE', New("SELF_TYPE")),
+               Method('ret', [], 'Object',
+                      Object("singleton")
+               ),
+            ])
+    ]
+    semant.install_base_classes(ast)
+    semant.build_inheritance_graph(ast)
+    for cl in ast:
+        semant.check_scopes_and_infer_return_types(cl)
+    for cl in ast:
+        semant.type_check(cl)
+
+
+def test_returning_self_forced_outside_inheritance_crashes():
+    ast = [
+            Class('B', 'Object', []),
+            Class('A', 'Object', [
+               Attr('singleton', 'SELF_TYPE', New("SELF_TYPE")),
+               Method('ret', [], 'B',
+                      Object("singleton")
+               ),
+            ])
+    ]
+    semant.install_base_classes(ast)
+    semant.build_inheritance_graph(ast)
+    for cl in ast:
+        semant.check_scopes_and_infer_return_types(cl)
+    with pytest.raises(semant.SemantError) as e:
+        for cl in ast:
+            semant.type_check(cl)
+    assert str(e.value) == "Inferred type A for method ret does not conform to declared type B"
 
 

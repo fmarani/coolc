@@ -1,5 +1,5 @@
 from .parser import Class, Method, Attr, Object, Int, Str, Block, Assign, \
-        Dispatch, StaticDispatch, SelfDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
+        Dispatch, StaticDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
         If, While, Let, Case, New, Isvoid, Neg, Not
 
 from collections import defaultdict, MutableMapping, Set
@@ -172,8 +172,14 @@ def check_scopes_and_infer_return_types(cl):
             if feature.name in attr_seen:
                 raise SemantError("attribute %s is already defined" % feature.name)
             attr_seen.add(feature.name)
-            variable_scopes[feature.name] = feature.type
-            traverse_expression(feature.body, variable_scopes)
+
+            if feature.type == "SELF_TYPE":
+                realtype = cl.name
+            else:
+                realtype = feature.type
+
+            variable_scopes[feature.name] = realtype
+            traverse_expression(feature.body, variable_scopes, cl)
         elif isinstance(feature, Method):
             if feature.name in method_seen:
                 raise SemantError("method %s is already defined" % feature.name)
@@ -187,7 +193,7 @@ def check_scopes_and_infer_return_types(cl):
                 formals_seen.add(formal)
                 variable_scopes[formal[0]] = formal[1]
 
-            traverse_expression(feature.body, variable_scopes)
+            traverse_expression(feature.body, variable_scopes, cl)
             variable_scopes.destroy_scope()
 
 
@@ -212,69 +218,77 @@ def lowest_common_ancestor(*classes):
             return inheritance_paths[0][step-1]  # any would do
 
 
-def traverse_expression(expression, variable_scopes):
+def traverse_expression(expression, variable_scopes, cl):
     if isinstance(expression, Isvoid):
-        traverse_expression(expression.body, variable_scopes)
+        traverse_expression(expression.body, variable_scopes, cl)
         expression.return_type = "Bool"
     elif any(isinstance(expression, X) for X in [Eq, Lt, Le]):
-        traverse_expression(expression.first, variable_scopes)
-        traverse_expression(expression.second, variable_scopes)
+        traverse_expression(expression.first, variable_scopes, cl)
+        traverse_expression(expression.second, variable_scopes, cl)
         expression.return_type = "Bool"
     elif isinstance(expression, Neg):
-        traverse_expression(expression.body, variable_scopes)
+        traverse_expression(expression.body, variable_scopes, cl)
         expression.return_type = "Bool"
     elif isinstance(expression, Not):
-        traverse_expression(expression.body, variable_scopes)
+        traverse_expression(expression.body, variable_scopes, cl)
         expression.return_type = "Bool"
     elif any(isinstance(expression, X) for X in [Plus, Sub, Mult, Div]):
-        traverse_expression(expression.first, variable_scopes)
-        traverse_expression(expression.second, variable_scopes)
+        traverse_expression(expression.first, variable_scopes, cl)
+        traverse_expression(expression.second, variable_scopes, cl)
         expression.return_type = "Int"
     elif isinstance(expression, While):
-        traverse_expression(expression.predicate, variable_scopes)
-        traverse_expression(expression.body, variable_scopes)
+        traverse_expression(expression.predicate, variable_scopes, cl)
+        traverse_expression(expression.body, variable_scopes, cl)
     elif isinstance(expression, Let):
         # LET creates a new scope
         variable_scopes.new_scope()
         variable_scopes[expression.object] = expression.type
-        traverse_expression(expression.init, variable_scopes)
-        traverse_expression(expression.body, variable_scopes)
+        traverse_expression(expression.init, variable_scopes, cl)
+        traverse_expression(expression.body, variable_scopes, cl)
         variable_scopes.destroy_scope()
         expression.return_type = expression.body.return_type
     elif isinstance(expression, Block):
         last_type = None
         for expr in expression.body:
-            traverse_expression(expr, variable_scopes)
+            traverse_expression(expr, variable_scopes, cl)
             last_type = getattr(expr, 'return_type', None)
         expression.return_type = last_type
     elif isinstance(expression, Assign):
-        traverse_expression(expression.body, variable_scopes)
-        traverse_expression(expression.name, variable_scopes)
+        traverse_expression(expression.body, variable_scopes, cl)
+        traverse_expression(expression.name, variable_scopes, cl)
     elif isinstance(expression, Dispatch) or isinstance(expression, StaticDispatch):
-        traverse_expression(expression.body, variable_scopes)
+        traverse_expression(expression.body, variable_scopes, cl)
         for expr in expression.expr_list:
-            traverse_expression(expr, variable_scopes)
+            traverse_expression(expr, variable_scopes, cl)
     elif isinstance(expression, If):
-        traverse_expression(expression.predicate, variable_scopes)
-        traverse_expression(expression.then_body, variable_scopes)
-        traverse_expression(expression.else_body, variable_scopes)
+        traverse_expression(expression.predicate, variable_scopes, cl)
+        traverse_expression(expression.then_body, variable_scopes, cl)
+        traverse_expression(expression.else_body, variable_scopes, cl)
         then_type = classes_dict[expression.then_body.return_type]
         else_type = classes_dict[expression.else_body.return_type]
         ret_type = lowest_common_ancestor(then_type, else_type)
         expression.return_type = ret_type
     elif isinstance(expression, Case):
-        traverse_expression(expression.expr, variable_scopes)
+        traverse_expression(expression.expr, variable_scopes, cl)
         branch_types = []
         for case in expression.case_list:
             variable_scopes.new_scope()  # every branch of case has its own scope
             variable_scopes[case[0]] = case[1]
-            traverse_expression(case[2], variable_scopes)
+            traverse_expression(case[2], variable_scopes, cl)
             branch_types.append(classes_dict[case[2].return_type])
         expression.return_type = lowest_common_ancestor(*branch_types)
     elif isinstance(expression, Object):
+        if expression.name == "self":
+            expression.return_type = cl.name
+            return
         if expression.name not in variable_scopes:
             raise SemantError("variable %s not in scope" % expression.name)
         expression.return_type = variable_scopes[expression.name]
+    elif isinstance(expression, New):
+        if expression.type == "SELF_TYPE":
+            expression.return_type = cl.name
+            return
+        expression.return_type = expression.type
     elif isinstance(expression, Int):
         expression.return_type = "Int"
     elif isinstance(expression, Str):
@@ -344,11 +358,15 @@ def type_check(cl):
     """make sure the inferred types match the declared types"""
     for feature in cl.feature_list:
         if isinstance(feature, Attr):
+            if feature.type == "SELF_TYPE":
+                realtype = cl.name
+            else:
+                realtype = feature.type
+
             if feature.body:
-                # FIXME: deal with SELF TYPE
-                type_check_expression(feature.body)
+                type_check_expression(feature.body, cl)
                 childcln = feature.body.return_type
-                parentcln = feature.type
+                parentcln = realtype
                 if not is_conformant(childcln, parentcln):
                     raise SemantError("Inferred type %s for attribute %s does not conform to declared type %s" % (childcln, feature.name, parentcln))
         elif isinstance(feature, Method):
@@ -357,43 +375,53 @@ def type_check(cl):
                     raise SemantError("formal %s cannot have type SELF_TYPE" % formal[0])
                 elif formal[1] not in classes_dict:
                     raise SemantError("formal %s has a undefined type" % formal[0])
+
+            if feature.return_type == "SELF_TYPE":
+                realrettype = cl.name
+            else:
+                realrettype = feature.return_type
+
             if feature.body is None:
                 continue  # for internal classes, some methods body are not defined
-            type_check_expression(feature.body)
+
+            type_check_expression(feature.body, cl)
             returnedcln = feature.body.return_type
-            declaredcln = feature.return_type
+            declaredcln = realrettype
             if not is_conformant(returnedcln, declaredcln):
                 raise SemantError("Inferred type %s for method %s does not conform to declared type %s" % (returnedcln, feature.name, declaredcln))
 
 
 
-def type_check_expression(expression):
+def type_check_expression(expression, cl):
     """make sure types validate at any point in the ast"""
     if isinstance(expression, Case):
-        type_check_expression(expression.expr)
+        type_check_expression(expression.expr, cl)
         for case in expression.case_list:
-            type_check_expression(case[2])
+            type_check_expression(case[2], cl)
     elif isinstance(expression, Assign):
-        type_check_expression(expression.body)
+        type_check_expression(expression.body, cl)
         if not is_conformant(expression.body.return_type, expression.name.return_type):
             raise SemantError("The inferred type %s for %s is not conformant to declared type %s" % (expression.body.return_type, expression.name.name, expression.name.return_type))
     elif isinstance(expression, If):
-        type_check_expression(expression.predicate)
-        type_check_expression(expression.then_body)
-        type_check_expression(expression.else_body)
+        type_check_expression(expression.predicate, cl)
+        type_check_expression(expression.then_body, cl)
+        type_check_expression(expression.else_body, cl)
         if expression.predicate.return_type != "Bool":
             raise SemantError("If statements must have boolean conditions")
     elif isinstance(expression, Let):
-        type_check_expression(expression.init)
+        type_check_expression(expression.init, cl)
         if not is_conformant(expression.init.return_type, expression.type):
             raise SemantError("The inferred type %s for let init is not conformant to declared type %s" % (expression.init.return_type, expression.type))
     elif isinstance(expression, Block):
         for line in expression.body:
-            type_check_expression(line)
+            type_check_expression(line, cl)
     elif isinstance(expression, Dispatch) or isinstance(expression, StaticDispatch):
-        type_check_expression(expression.body)
-        # FIXME: deal with selftype
-        bodycln = expression.body.return_type
+        type_check_expression(expression.body, cl)
+        # in case it's self, use current class name
+        if expression.body == "self":
+            bodycln = cl.name
+        else:
+            bodycln = expression.body.return_type
         if isinstance(expression, StaticDispatch):
             # additional check on static dispatch
             if not is_conformant(bodycln, expression.type):
@@ -414,33 +442,33 @@ def type_check_expression(expression):
                 if not is_conformant(expr.return_type, formal[1]):
                     raise SemantError("Argument {} passed to method {} in class {} is not conformant to its {} declaration".format(expr.return_type, called_method.name, bodycl.name, formal[1]))
     elif isinstance(expression, While):
-        type_check_expression(expression.predicate)
-        type_check_expression(expression.body)
+        type_check_expression(expression.predicate, cl)
+        type_check_expression(expression.body, cl)
         if expression.predicate.return_type != "Bool":
             raise SemantError("While statement must have boolean conditions")
     elif isinstance(expression, Isvoid):
-        type_check_expression(expression.body)
+        type_check_expression(expression.body, cl)
     elif isinstance(expression, Not):
-        type_check_expression(expression.body)
+        type_check_expression(expression.body, cl)
         if expression.body.return_type != "Bool":
             raise SemantError("Not statement require boolean values")
     elif isinstance(expression, Lt) or isinstance(expression, Le):
-        type_check_expression(expression.first)
-        type_check_expression(expression.second)
+        type_check_expression(expression.first, cl)
+        type_check_expression(expression.second, cl)
         if expression.first.return_type != "Int" or expression.second.return_type != "Int":
             raise SemantError("Non-integer arguments cannot be check with < == or <=")
     elif isinstance(expression, Neg):
-        type_check_expression(expression.body)
+        type_check_expression(expression.body, cl)
         if expression.body.return_type != "Int":
             raise SemantError("Negative statement require integer values")
     elif any(isinstance(expression, X) for X in [Plus, Sub, Mult, Div]):
-        type_check_expression(expression.first)
-        type_check_expression(expression.second)
+        type_check_expression(expression.first, cl)
+        type_check_expression(expression.second, cl)
         if expression.first.return_type != "Int" or expression.second.return_type != "Int":
             raise SemantError("Arithmetic operations require integers")
     elif isinstance(expression, Eq):
-        type_check_expression(expression.first)
-        type_check_expression(expression.second)
+        type_check_expression(expression.first, cl)
+        type_check_expression(expression.second, cl)
         type1 = expression.first.return_type
         type2 = expression.second.return_type
         if (type1 == "Int" and type2 == "Int") or \

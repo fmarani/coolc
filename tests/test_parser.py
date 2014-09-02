@@ -1,6 +1,6 @@
 from compiler.parser import parser
 from compiler.parser import Class, Method, Attr, Object, Int, Str, Block, Assign, \
-        Dispatch, StaticDispatch, SelfDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
+        Dispatch, StaticDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
         If, While, Let, Case, New, Isvoid, Neg, Not
 
 def test_empty_class_definition():
@@ -171,7 +171,7 @@ def test_self_dispatch_with_no_args():
     };"""
     expected = [Class('A', 'Object',
                 [
-                    Method('funk', [], 'Type', SelfDispatch('method', [])),
+                    Method('funk', [], 'Type', Dispatch('self', 'method', [])),
                 ]
                 )]
     assert parser.parse(program) == expected

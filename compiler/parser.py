@@ -24,7 +24,6 @@ Block = returnable_namedtuple("Block", "body")
 Assign = namedtuple("Assign", "name, body")
 Dispatch = returnable_namedtuple("Dispatch", "body, method, expr_list")
 StaticDispatch = returnable_namedtuple("StaticDispatch", "body, type, method, expr_list")
-SelfDispatch = returnable_namedtuple("SelfDispatch", "method, expr_list")
 Plus = returnable_namedtuple("Plus", "first, second")
 Sub = returnable_namedtuple("Sub", "first, second")
 Mult = returnable_namedtuple("Mult", "first, second")
@@ -148,7 +147,7 @@ def p_expression_static_dispatch(p):
 
 def p_expression_self_dispatch(p):
     """expression : OBJECTID LPAREN expr_list RPAREN"""
-    p[0] = SelfDispatch(p[1], p[3])
+    p[0] = Dispatch("self", p[1], p[3])
 
 def p_expression_basic_math(p):
     """
