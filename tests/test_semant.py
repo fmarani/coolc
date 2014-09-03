@@ -444,30 +444,14 @@ def test_let_statements_initialized_with_correct_type_validates():
         semant.type_check(cl)
 
 
-def test_static_dispatch_to_inexistent_classes_are_invalid():
-    ast = [
-            Class('A', 'Object', [
-               Attr('support', 'SupportClass', None),
-               Method('funk', [], 'Int',
-                   StaticDispatch(Object("support"), "InexistentClass", "method", [])
-               ),
-            ])
-    ]
-    semant.install_base_classes(ast)
-    semant.build_inheritance_graph(ast)
-    semant.expand_inherited_classes()
-    for cl in ast:
-        semant.check_scopes_and_infer_return_types(cl)
-    with pytest.raises(semant.SemantError) as e:
-        for cl in ast:
-            semant.type_check(cl)
-    assert str(e.value) == "Static dispatch expression (before @Type) does not conform to declared type InexistentClass"
-
-
 def test_static_dispatch_to_existent_classes_outside_inheritance_tree_are_invalid():
     ast = [
-            Class('SupportClass', 'Object', []),
-            Class('NoSupportClass', 'Object', []),
+            Class('SupportClass', 'Object', [
+               Method('method', [], None, None)
+            ]),
+            Class('NoSupportClass', 'Object', [
+               Method('method', [], None, None)
+            ]),
             Class('A', 'Object', [
                Attr('support', 'SupportClass', None),
                Method('funk', [], 'Int',
@@ -494,7 +478,7 @@ def test_static_dispatch_to_existent_classes_inside_inheritance_tree_are_valid()
             Class('SupportSubClass', 'SupportClass', []),
             Class('A', 'Object', [
                Attr('support', 'SupportSubClass', None),
-               Method('funk', [], None,
+               Method('funk', [], 'Int',
                    StaticDispatch(Object("support"), "SupportClass", "method", [])
                ),
             ])
@@ -523,9 +507,9 @@ def test_dispatch_to_inexistent_method_crashes():
     semant.install_base_classes(ast)
     semant.build_inheritance_graph(ast)
     semant.expand_inherited_classes()
-    for cl in ast:
-        semant.check_scopes_and_infer_return_types(cl)
     with pytest.raises(semant.SemantError) as e:
+        for cl in ast:
+            semant.check_scopes_and_infer_return_types(cl)
         for cl in ast:
             semant.type_check(cl)
     assert str(e.value) == "Tried to call an undefined method in class SupportClass"
@@ -584,7 +568,7 @@ def test_dispatch_to_existent_method_with_right_args_succeeds():
                 ]),
             Class('A', 'Object', [
                Attr('support', 'SupportClass', None),
-               Method('funk', [], None,
+               Method('funk', [], 'Int',
                    Dispatch(Object("support"), "addOne", [Int(2)])
                ),
             ])
@@ -609,9 +593,9 @@ def test_self_dispatch_to_inexistent_method_crashes():
     semant.install_base_classes(ast)
     semant.build_inheritance_graph(ast)
     semant.expand_inherited_classes()
-    for cl in ast:
-        semant.check_scopes_and_infer_return_types(cl)
     with pytest.raises(semant.SemantError) as e:
+        for cl in ast:
+            semant.check_scopes_and_infer_return_types(cl)
         for cl in ast:
             semant.type_check(cl)
     assert str(e.value) == "Tried to call an undefined method in class A"
@@ -621,7 +605,7 @@ def test_self_dispatch_to_existent_method_with_right_args_succeeds():
     ast = [
             Class('A', 'Object', [
                Method('addOne', [('x', 'Int')], 'Int', Plus(Object('x'), Int(1))),
-               Method('funk', [], None,
+               Method('funk', [], 'Int',
                    Dispatch("self", "addOne", [Int(2)])
                ),
             ])

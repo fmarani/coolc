@@ -260,6 +260,31 @@ def traverse_expression(expression, variable_scopes, cl):
         traverse_expression(expression.body, variable_scopes, cl)
         for expr in expression.expr_list:
             traverse_expression(expr, variable_scopes, cl)
+
+        # REDUNDANT code, copied from type_check because we need to infer
+        # the dispatch return type from the called method type
+
+        # in case it's self, use current class name
+        if expression.body == "self":
+            bodycln = cl.name
+        else:
+            bodycln = expression.body.return_type
+
+        called_method = None
+        if bodycln in classes_dict:
+            bodycl = classes_dict[bodycln]
+            for feature in bodycl.feature_list:
+                if isinstance(feature, Method) and feature.name == expression.method:
+                    called_method = feature
+        if not called_method:
+            raise SemantError("Tried to call an undefined method in class %s" % bodycln)
+
+        if called_method.return_type == "SELF_TYPE":
+            method_type = cl.name
+        else:
+            method_type = called_method.return_type
+
+        expression.return_type = method_type
     elif isinstance(expression, If):
         traverse_expression(expression.predicate, variable_scopes, cl)
         traverse_expression(expression.then_body, variable_scopes, cl)
@@ -382,10 +407,16 @@ def type_check(cl):
                 realrettype = feature.return_type
 
             if feature.body is None:
-                continue  # for internal classes, some methods body are not defined
+                # for internal classes, some methods body are not defined
+                # assume they return SELF_TYPE
+                if feature.return_type == "SELF_TYPE":
+                    returnedcln = cl.name
+                else:
+                    returnedcln = feature.return_type
+            else:
+                type_check_expression(feature.body, cl)
+                returnedcln = feature.body.return_type
 
-            type_check_expression(feature.body, cl)
-            returnedcln = feature.body.return_type
             declaredcln = realrettype
             if not is_conformant(returnedcln, declaredcln):
                 raise SemantError("Inferred type %s for method %s does not conform to declared type %s" % (returnedcln, feature.name, declaredcln))
@@ -428,10 +459,11 @@ def type_check_expression(expression, cl):
                 raise SemantError("Static dispatch expression (before @Type) does not conform to declared type {}".format(expression.type))
 
         called_method = None
-        bodycl = classes_dict[bodycln]
-        for feature in bodycl.feature_list:
-            if isinstance(feature, Method) and feature.name == expression.method:
-                called_method = feature
+        if bodycln in classes_dict:
+            bodycl = classes_dict[bodycln]
+            for feature in bodycl.feature_list:
+                if isinstance(feature, Method) and feature.name == expression.method:
+                    called_method = feature
         if not called_method:
             raise SemantError("Tried to call an undefined method in class %s" % bodycl.name)
         if len(expression.expr_list) != len(called_method.formal_list):
