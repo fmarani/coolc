@@ -442,3 +442,20 @@ def test_two_classes_defined():
     assert parser.parse(program) == expected
 
 
+def test_operator_precedence_in_if_statements():
+    program = """
+    class A {
+       funk():Type {
+            if 3 + 4 < 0 then 1 else 2 fi
+       };
+    };"""
+    expected = [Class('A', 'Object',
+                [
+                    Method('funk', [], 'Type',
+                        If(Lt(Plus(Int(3), Int(4)), Int(0)), Int(1), Int(2))
+                     ),
+                ]
+                )]
+    assert parser.parse(program) == expected
+
+

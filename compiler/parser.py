@@ -32,7 +32,7 @@ Lt = returnable_namedtuple("Lt", "first, second")
 Le = returnable_namedtuple("Le", "first, second")
 Eq = returnable_namedtuple("Eq", "first, second")
 If = returnable_namedtuple("If", "predicate, then_body, else_body")
-While = namedtuple("While", "predicate, body")
+While = returnable_namedtuple("While", "predicate, body")
 Let = returnable_namedtuple("Let", "object, type, init, body")
 Case = returnable_namedtuple("Case", "expr, case_list")
 New = returnable_namedtuple("New", "type")
@@ -175,7 +175,7 @@ def p_expression_numerical_comparison(p):
         p[0] = Lt(p[1], p[3])
     elif p[2] == '<=':
         p[0] = Le(p[1], p[3])
-    elif p[2] == '==':
+    elif p[2] == '=':
         p[0] = Eq(p[1], p[3])
 
 def p_expression_with_parenthesis(p):
@@ -251,6 +251,20 @@ def p_expression_neg(p):
 def p_expression_not(p):
     """expression : NOT expression"""
     p[0] = Not(p[2])
+
+
+# precedence rules
+precedence = (
+    ('right', 'ASSIGN'),
+    ('left', 'NOT'),
+    ('nonassoc', 'LE', 'LT', 'EQ'),
+    ('left', 'PLUS', 'MINUS'),
+    ('left', 'MULT', 'DIV'),
+    ('left', 'ISVOID'),
+    ('left', 'NEG'),
+    ('left', 'AT'),
+    ('left', 'DOT'),
+)
 
 # Error rule for syntax errors
 def p_error(p):
