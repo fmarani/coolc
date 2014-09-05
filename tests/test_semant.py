@@ -512,7 +512,7 @@ def test_dispatch_to_inexistent_method_crashes():
             semant.check_scopes_and_infer_return_types(cl)
         for cl in ast:
             semant.type_check(cl)
-    assert str(e.value) == "Tried to call an undefined method in class SupportClass"
+    assert str(e.value) == "Tried to call the undefined method ghostmethod in class SupportClass"
 
 
 def test_dispatch_to_existent_method_with_wrong_args_gives_error():
@@ -598,7 +598,7 @@ def test_self_dispatch_to_inexistent_method_crashes():
             semant.check_scopes_and_infer_return_types(cl)
         for cl in ast:
             semant.type_check(cl)
-    assert str(e.value) == "Tried to call an undefined method in class A"
+    assert str(e.value) == "Tried to call the undefined method ghostmethod in class A"
 
 
 def test_self_dispatch_to_existent_method_with_right_args_succeeds():
@@ -732,5 +732,27 @@ def test_returning_self_forced_outside_inheritance_crashes():
         for cl in ast:
             semant.type_check(cl)
     assert str(e.value) == "Inferred type A for method ret does not conform to declared type B"
+
+
+def test_class_with_method_redefinition_works():
+    ast = [
+            Class('A', 'Object', [
+                     Method('funk', [], 'Int', Int(1)),
+                     ]),
+            Class('B', 'A', [
+                     Method('funk', [], 'Int', Int(1)),
+                     ]),
+            Class('C', 'B', [
+                     Method('funk', [], 'Int', Int(1)),
+            ])
+    ]
+    semant.install_base_classes(ast)
+    semant.build_inheritance_graph(ast)
+    for cl in ast:
+        semant.check_scopes_and_infer_return_types(cl)
+    for cl in ast:
+        semant.type_check(cl)
+
+
 
 

@@ -21,7 +21,7 @@ class SemantWarning(Warning):
 def install_base_classes(ast):
     """purpose of this is to add base classes always available in the language"""
     objc = Class("Object", None, [
-        Method('cool_abort', [], 'Object', None),  # aborts the program
+        Method('abort', [], 'Object', None),  # aborts the program
         Method('type_name', [], 'String', None),  # returns string repr of classname
         Method('copy', [], 'SELF_TYPE', None),  # object copy
     ])
@@ -217,6 +217,9 @@ def lowest_common_ancestor(*classes):
         if len(set(inheritance_points)) > 1:
             return inheritance_paths[0][step-1]  # any would do
 
+    # if we are here, means objects have the same type
+    return classes[0].name
+
 
 def traverse_expression(expression, variable_scopes, cl):
     if isinstance(expression, Isvoid):
@@ -277,10 +280,10 @@ def traverse_expression(expression, variable_scopes, cl):
                 if isinstance(feature, Method) and feature.name == expression.method:
                     called_method = feature
         if not called_method:
-            raise SemantError("Tried to call an undefined method in class %s" % bodycln)
+            raise SemantError("Tried to call the undefined method %s in class %s" % (expression.method, bodycl.name))
 
         if called_method.return_type == "SELF_TYPE":
-            method_type = cl.name
+            method_type = bodycl.name
         else:
             method_type = called_method.return_type
 
@@ -350,7 +353,9 @@ def expand_inherited_classes(start_class="Object"):
         method_signatures_for_child = extract_signatures(method_set_in_child)
         method_signatures_for_parent = extract_signatures(method_set_in_parent)
 
+        methods_in_child = set()
         for method in method_set_in_child:
+            methods_in_child.add(method.name)
             if method.name in method_signatures_for_parent:
                 parent_signature = method_signatures_for_parent[method.name]
                 child_signature = method_signatures_for_child[method.name]
@@ -361,7 +366,8 @@ def expand_inherited_classes(start_class="Object"):
         for attr in attr_set_in_parent:
             cl.feature_list.append(attr)
         for method in method_set_in_parent:
-            cl.feature_list.append(method)
+            if method.name not in methods_in_child:
+                cl.feature_list.append(method)
 
     # descend down the inheritance tree, applying the same function
     all_children = inheritance_graph[start_class]
@@ -441,8 +447,9 @@ def type_check_expression(expression, cl):
             raise SemantError("If statements must have boolean conditions")
     elif isinstance(expression, Let):
         type_check_expression(expression.init, cl)
-        if not is_conformant(expression.init.return_type, expression.type):
-            raise SemantError("The inferred type %s for let init is not conformant to declared type %s" % (expression.init.return_type, expression.type))
+        if expression.init:  # some let expression auto-initialize with default values
+            if not is_conformant(expression.init.return_type, expression.type):
+                raise SemantError("The inferred type %s for let init is not conformant to declared type %s" % (expression.init.return_type, expression.type))
     elif isinstance(expression, Block):
         for line in expression.body:
             type_check_expression(line, cl)
@@ -465,7 +472,7 @@ def type_check_expression(expression, cl):
                 if isinstance(feature, Method) and feature.name == expression.method:
                     called_method = feature
         if not called_method:
-            raise SemantError("Tried to call an undefined method in class %s" % bodycl.name)
+            raise SemantError("Tried to call the undefined method %s in class %s" % (expression.method, bodycl.name))
         if len(expression.expr_list) != len(called_method.formal_list):
             raise SemantError("Tried to call method {} in class {} with wrong number of arguments".format(called_method.name, bodycl.name))
         else:
@@ -505,7 +512,7 @@ def type_check_expression(expression, cl):
         type2 = expression.second.return_type
         if (type1 == "Int" and type2 == "Int") or \
            (type1 == "Bool" and type2 == "Bool") or \
-           (type1 == "Str" and type2 == "Str"):
+           (type1 == "String" and type2 == "String"):
             pass  # comparing basic types together is ok
         else:
             raise SemantError("Comparison is only possible among same base types")

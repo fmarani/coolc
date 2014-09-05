@@ -4,8 +4,8 @@ from compiler.parser import Class, Method, Attr, Object, Int, Str, Block, Assign
         If, While, Let, Case, New, Isvoid, Neg, Not
 
 def test_empty_class_definition():
-    program = "class A { };"
-    expected = [Class('A', 'Object', [])]
+    program = "class A2I { };"
+    expected = [Class('A2I', 'Object', [])]
     assert parser.parse(program) == expected
 
 
