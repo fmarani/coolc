@@ -1,6 +1,6 @@
 from .parser import Class, Method, Attr, Object, Int, Str, Block, Assign, \
         Dispatch, StaticDispatch, Plus, Sub, Mult, Div, Lt, Le, Eq, \
-        If, While, Let, Case, New, Isvoid, Neg, Not
+        If, While, Let, Case, New, Isvoid, Neg, Not, Bool
 
 from collections import defaultdict, MutableMapping, Set
 import warnings
@@ -319,6 +319,8 @@ def traverse_expression(expression, variable_scopes, cl):
         expression.return_type = expression.type
     elif isinstance(expression, Int):
         expression.return_type = "Int"
+    elif isinstance(expression, Bool):
+        expression.return_type = "Bool"
     elif isinstance(expression, Str):
         expression.return_type = "String"
 

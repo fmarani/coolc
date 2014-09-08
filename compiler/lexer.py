@@ -6,7 +6,8 @@ tokens = (
    'NEW', 'OF', 'NOT', 'LOOP', 'POOL', 'CASE', 'ESAC', 'IF', 'THEN', 'ELSE',
    'FI', 'WHILE', 'ASSIGN', 'LE', 'PLUS', 'MINUS', 'MULT', 'DIV', 'LPAREN',
    'RPAREN', 'LBRACE', 'RBRACE', 'DOT', 'COLON', 'COMMA', 'SEMI', 'EQ',
-   'NEG', 'LT', 'AT', 'TYPEID', 'OBJECTID', 'INT_CONST', 'STR_CONST', 'COMMENT'
+   'NEG', 'LT', 'AT', 'TYPEID', 'OBJECTID', 'INT_CONST', 'STR_CONST', 'COMMENT',
+   'BOOL_CONST'
 )
 
 reserved = ['class', 'in', 'inherits', 'isvoid', 'let', 'new', 'of', 'not', 'loop',
@@ -36,6 +37,15 @@ t_AT = '@'
 
 def t_objects_types_and_reserved_words(t):
     r'[a-zA-Z][a-zA-Z0-9_]*'
+    if t.value == 'true':
+        t.type = 'BOOL_CONST'
+        t.value = True
+        return t
+    if t.value == 'false':
+        t.type = 'BOOL_CONST'
+        t.value = False
+        return t
+
     if t.value.lower() in reserved:
         t.type = t.value.upper()
     else:

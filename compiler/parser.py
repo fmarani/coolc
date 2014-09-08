@@ -18,8 +18,9 @@ Class = namedtuple("Class", "name, parent, feature_list")
 Method = namedtuple("Method", "name, formal_list, return_type, body")
 Attr = namedtuple("Attr", "name, type, body")
 Object = returnable_namedtuple("Object", "name")
-Int = returnable_namedtuple("Int", "name")
-Str = returnable_namedtuple("Str", "name")
+Int = returnable_namedtuple("Int", "content")
+Bool = returnable_namedtuple("Bool", "content")
+Str = returnable_namedtuple("Str", "content")
 Block = returnable_namedtuple("Block", "body")
 Assign = namedtuple("Assign", "name, body")
 Dispatch = returnable_namedtuple("Dispatch", "body, method, expr_list")
@@ -103,6 +104,10 @@ def p_expression_object(p):
 def p_expression_int(p):
     """expression : INT_CONST"""
     p[0] = Int(p[1])
+
+def p_expression_bool(p):
+    """expression : BOOL_CONST"""
+    p[0] = Bool(p[1])
 
 def p_expression_str(p):
     """expression : STR_CONST"""
