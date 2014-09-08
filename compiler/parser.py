@@ -246,7 +246,7 @@ def p_expression_new(p):
     p[0] = New(p[2])
 
 def p_expression_isvoid(p):
-    """expression : ISVOID TYPEID"""
+    """expression : ISVOID expression"""
     p[0] = Isvoid(p[2])
 
 def p_expression_neg(p):

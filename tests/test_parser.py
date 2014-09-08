@@ -336,13 +336,13 @@ def test_isvoid():
     program = """
     class A {
        funk():Type {
-            isvoid B
+            isvoid b
        };
     };"""
     expected = [Class('A', 'Object',
                 [
                     Method('funk', [], 'Type',
-                        Isvoid('B')
+                        Isvoid(Object('b'))
                      ),
                 ]
                 )]
