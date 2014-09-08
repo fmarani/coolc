@@ -168,6 +168,7 @@ def check_scopes_and_infer_return_types(cl):
     attr_seen = set()
     method_seen = set()
     for feature in cl.feature_list:
+        # first add all attributes to the scope
         if isinstance(feature, Attr):
             if feature.name in attr_seen:
                 raise SemantError("attribute %s is already defined" % feature.name)
@@ -259,6 +260,7 @@ def traverse_expression(expression, variable_scopes, cl):
     elif isinstance(expression, Assign):
         traverse_expression(expression.body, variable_scopes, cl)
         traverse_expression(expression.name, variable_scopes, cl)
+        expression.return_type = expression.name.return_type  # type comes from var declaration
     elif isinstance(expression, Dispatch) or isinstance(expression, StaticDispatch):
         traverse_expression(expression.body, variable_scopes, cl)
         for expr in expression.expr_list:
@@ -332,8 +334,8 @@ def expand_inherited_classes(start_class="Object"):
         parentcl = classes_dict[cl.parent]
 
         # Not performant, but cleaner
-        attr_set_in_child = {i for i in cl.feature_list if isinstance(i, Attr)}
-        attr_set_in_parent = {i for i in parentcl.feature_list if isinstance(i, Attr)}
+        attr_set_in_child = [i for i in cl.feature_list if isinstance(i, Attr)]
+        attr_set_in_parent = [i for i in parentcl.feature_list if isinstance(i, Attr)]
 
         for attr in attr_set_in_child:
             for pattr in attr_set_in_parent:
@@ -429,8 +431,11 @@ def type_check(cl):
                 returnedcln = feature.body.return_type
 
             declaredcln = realrettype
-            if not is_conformant(returnedcln, declaredcln):
-                raise SemantError("Inferred type %s for method %s does not conform to declared type %s" % (returnedcln, feature.name, declaredcln))
+            if returnedcln is None:
+                warnings.warn("untyped content for method %s with declared type %s" % (feature.name, declaredcln), SemantWarning)
+            else:
+                if not is_conformant(returnedcln, declaredcln):
+                    raise SemantError("Inferred type %s for method %s does not conform to declared type %s" % (returnedcln, feature.name, declaredcln))
 
 
 
@@ -460,7 +465,7 @@ def type_check_expression(expression, cl):
             type_check_expression(line, cl)
     elif isinstance(expression, Dispatch) or isinstance(expression, StaticDispatch):
         type_check_expression(expression.body, cl)
-        # in case it's self, use current class name
+        # dispatch to current instance (self)
         if expression.body == "self":
             bodycln = cl.name
         else:

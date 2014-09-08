@@ -8,8 +8,6 @@ with open(sys.argv[1], 'r') as f:
     if ast is None:
         print("Cannot parse!")
     else:
-        print("AST:")
-        print(ast)
         try:
             compiler.run_semant(ast)
         except compiler.SemantError as e:
