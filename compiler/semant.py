@@ -4,7 +4,7 @@ from .parser import Class, Method, Attr, Object, Int, Str, Block, Assign, \
 
 from collections import defaultdict, MutableMapping, Set
 import warnings
-
+from copy import deepcopy
 
 class SemantError(Exception):
     pass
@@ -365,11 +365,14 @@ def expand_inherited_classes(start_class="Object"):
                     raise SemantError("Redefined method %s cannot change arguments or return type of the parent method" % method.name)
 
         # finished checks, now apply inheritance by simply copying definitions
-        for attr in attr_set_in_parent:
-            cl.feature_list.append(attr)
+        # DEEPCOPY of sub-asts to avoid interference with type inference and
+        # type checking
+        # insert instead of append so they are evaluated earlier
         for method in method_set_in_parent:
             if method.name not in methods_in_child:
-                cl.feature_list.append(method)
+                cl.feature_list.insert(0, deepcopy(method))
+        for attr in attr_set_in_parent:
+            cl.feature_list.insert(0, deepcopy(attr))
 
     # descend down the inheritance tree, applying the same function
     all_children = inheritance_graph[start_class]
