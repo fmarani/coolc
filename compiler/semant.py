@@ -180,6 +180,8 @@ def check_scopes_and_infer_return_types(cl):
                 realtype = feature.type
 
             variable_scopes[feature.name] = realtype
+    for feature in cl.feature_list:
+        if isinstance(feature, Attr):
             traverse_expression(feature.body, variable_scopes, cl)
         elif isinstance(feature, Method):
             if feature.name in method_seen:
