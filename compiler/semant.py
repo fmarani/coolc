@@ -234,7 +234,7 @@ def traverse_expression(expression, variable_scopes, cl):
         expression.return_type = "Bool"
     elif isinstance(expression, Neg):
         traverse_expression(expression.body, variable_scopes, cl)
-        expression.return_type = "Bool"
+        expression.return_type = "Int"
     elif isinstance(expression, Not):
         traverse_expression(expression.body, variable_scopes, cl)
         expression.return_type = "Bool"
