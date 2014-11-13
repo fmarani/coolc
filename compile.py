@@ -9,8 +9,10 @@ with open(sys.argv[1], 'r') as f:
         print("Cannot parse!")
     else:
         try:
-            compiler.run_semant(ast)
+            classes_dict = compiler.run_semant(ast)
         except compiler.SemantError as e:
             print("Semantic Analyzer failure: %s" % str(e))
         else:
-            print("Success!")
+            code = compiler.run_codegen(ast, classes_dict)
+            print("Generated MIPS code:")
+            print(code.getvalue())
