@@ -370,11 +370,14 @@ def expand_inherited_classes(start_class="Object"):
 
         # finished checks, now apply inheritance by simply copying definitions
         # DEEPCOPY of sub-asts to avoid interference with type inference and
-        # type checking
+        # type checking (all type inference is stored inside return_type
+        # fields)
         # insert instead of append so they are evaluated earlier
         for method in method_set_in_parent:
             if method.name not in methods_in_child:
-                cl.feature_list.insert(0, deepcopy(method))
+                new_method = deepcopy(method)
+                new_method.inherited_from = cl.parent  # used in codegen, to reuse function bodies
+                cl.feature_list.insert(0, new_method)
         for attr in attr_set_in_parent:
             cl.feature_list.insert(0, deepcopy(attr))
 
@@ -541,5 +544,6 @@ def semant(ast):
         check_scopes_and_infer_return_types(cl)
     for cl in classes_dict.values():
         type_check(cl)
+    return classes_dict
 
 

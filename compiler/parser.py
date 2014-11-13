@@ -7,6 +7,7 @@ from .lexer import tokens
 
 # namedtuple is the main representation in the ast, but sometimes we need
 # the ability to add more information, used for the compiler internally
+\
 # inferred return types are one of this internal piece of information
 class Returnable:
     return_type = None
@@ -14,8 +15,15 @@ class Returnable:
 def returnable_namedtuple(type_name, fields):
     return new_class(type_name, (Returnable, namedtuple(type_name, fields)))
 
+# also inheritable objects
+class Inheritable:
+    inherited_from = None
+
+def inheritable_namedtuple(type_name, fields):
+    return new_class(type_name, (Inheritable, namedtuple(type_name, fields)))
+
 Class = namedtuple("Class", "name, parent, feature_list")
-Method = namedtuple("Method", "name, formal_list, return_type, body")
+Method = inheritable_namedtuple("Method", "name, formal_list, return_type, body")
 Attr = namedtuple("Attr", "name, type, body")
 Object = returnable_namedtuple("Object", "name")
 Int = returnable_namedtuple("Int", "content")
