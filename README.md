@@ -1,6 +1,8 @@
 COOL
 ---
 
+*work in progress*
+
 A compiler for COOL (Classroom Object Oriented Language) written in Python. Explained here: https://www.coursera.org/course/compilers
 
 I wrote this in Python from scratch, after having written it in Java, so I could learn every step. I would strongly advise you not to copy this to solve the class quizzes!!!
